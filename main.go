@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -11,7 +12,7 @@ import (
 
 var (
 	clientId = "myclient"
-	clientSecret = "fc81e341-2415-4a06-9acd-52a9d5a3b4f8"
+	clientSecret = "bf6ba301-165f-4e42-b668-ad203d47ea3f"
 )
 
 func main() {
@@ -32,9 +33,36 @@ func main() {
 
 	state := "123UmaSenhaQualquer!"
 
-http.HandleFunc("/", func(response http.ResponseWriter, request *http.Request) {
-	http.Redirect(response, request, config.AuthCodeURL(state), http.StatusFound)
-})
+	http.HandleFunc("/", func(response http.ResponseWriter, request *http.Request) {
+		http.Redirect(response, request, config.AuthCodeURL(state), http.StatusFound)
+	})
+
+	http.HandleFunc("/auth/callback", func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Query().Get("state") != state {
+			http.Error(response, "State is invalid.", http.StatusBadRequest)
+			return 
+		}
+
+		//exchange the token sent by Keycloak for a access token
+		token, err := config.Exchange(ctx, request.URL.Query().Get("code"))
+		if err != nil {
+			http.Error(response, "Fail to exchange token.", http.StatusInternalServerError)
+			return
+		}
+			
+		//transforma o toke para JSON
+		resp := struct {AccessToken *oauth2.Token}{
+			token,
+		}
+		
+		data, err := json.Marshal(resp)
+		if err != nil {
+			http.Error(response, err.Error(), http.StatusInternalServerError) 
+			return
+		}
+
+		response.Write(data)
+	})
 
 	log.Fatal(http.ListenAndServe(":8081", nil))
 }
