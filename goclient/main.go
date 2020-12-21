@@ -49,10 +49,28 @@ func main() {
 			http.Error(response, "Fail to exchange token.", http.StatusInternalServerError)
 			return
 		}
-			
+		
+		idToken, ok := token.Extra("id_token").(string)
+		if !ok {
+			http.Error(response, "Fail on generating the ID token.", http.StatusInternalServerError)
+			return
+		}
+
+		userInfo, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(token))
+		if err != nil {
+			http.Error(response, "Fail to get user information.", http.StatusInternalServerError)
+			return
+		}
+
 		//transforma o toke para JSON
-		resp := struct {AccessToken *oauth2.Token}{
-			token,
+		resp := struct {
+			AccessToken *oauth2.Token
+			IDToken string
+			UserInfo *oidc.UserInfo
+		}{
+			token, 
+			idToken,
+			userInfo,
 		}
 		
 		data, err := json.Marshal(resp)
